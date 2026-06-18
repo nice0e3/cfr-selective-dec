@@ -1,6 +1,6 @@
 # cfr-selective-dec
 
-语言：[English](README.md) | [简体中文](README.zh-CN.md)
+语言：[简体中文](README.md) | [English](README.en.md)
 
 基于 CFR 的 Java 批量反编译工具，适用于本地代码审计。它可以扫描 `.jar`、`.war`、class 目录和嵌套归档，按包名前缀筛选目标 class，并通过固定大小分组、缓存检查和逐轮重试完成反编译。
 

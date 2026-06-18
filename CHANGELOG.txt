@@ -32,6 +32,16 @@ All notable changes are listed with the newest version first.
   **输出锁分组**：`outputLocks` 改为按父目录分组而非按文件路径，减少锁对象数量，同时保持正确性。
   **AtomicLong 命名**：嵌套归档临时文件命名从 `System.nanoTime()` 改为 `AtomicLong` 计数器，消除高并发冲突风险。
 
+## 1.0.3
+
+- Fixed anonymous and inner class decompilation by injecting required outer classes into the temporary batch jar passed to CFR.
+- Added source-level class lookup support to `InputSource`, `DirectoryInputSource`, and `ZipInputSource` so related outer classes can be resolved from directories and archives.
+- Improved batch jar construction to include matching outer class bytecode when an inner class such as `Outer$Inner.class` or an anonymous class is selected.
+
+  修复匿名类和内部类反编译问题：向传给 CFR 的临时批处理 jar 注入必要的外部类。
+  为 `InputSource`、`DirectoryInputSource` 和 `ZipInputSource` 增加按 class entry 查找字节码的能力，便于从目录或归档中解析相关外部类。
+  改进批处理 jar 构建逻辑：当选中 `Outer$Inner.class` 或匿名类时，同时包含匹配的外部类字节码。
+
 ## 1.0.2
 
 - Replaced class risk classification with a fixed-size queue decompilation model.
@@ -47,7 +57,17 @@ All notable changes are listed with the newest version first.
 - Removed Windows `.bat` scripts and changed release workflow builds to use Maven directly.
 - Added manual GitHub release workflow support.
 
-## 1.0.0-SNAPSHOT
+## 1.0.1
+
+- Added support for empty package filters: when no package prefix is provided, the tool now decompiles all discovered classes by default.
+- Updated CLI help and README documentation to describe the no-package-filter behavior.
+- Added `ClassFileNames` normalization helpers and adjusted package matching for the default-all behavior.
+
+  增加空包名筛选支持：不提供包名前缀时默认反编译所有发现的 class。
+  更新命令行帮助和 README，说明不指定包名前缀时的默认行为。
+  增加 `ClassFileNames` 规范化辅助逻辑，并调整包名匹配以支持默认全量反编译。
+
+## 1.0.0
 
 - Initial CFR-based selective batch decompiler.
 - Supported `.jar`, `.war`, directories, nested archives, Spring Boot layouts, and WAR layouts.
