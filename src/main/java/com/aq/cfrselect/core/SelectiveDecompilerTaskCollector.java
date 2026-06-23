@@ -115,7 +115,7 @@ final class SelectiveDecompilerTaskCollector {
             String displayName = classFile.rootName.isEmpty()
                     ? "classes!" + classFile.entryName
                     : classFile.rootName + "!" + classFile.entryName;
-            Path taskOutputDir = classFile.rootName.isEmpty() ? outputDir : outputDir.resolve(classFile.rootName);
+            Path taskOutputDir = outputDirForClassFile(outputDir, classFile.rootName);
             tasks.add(new DecompileTask(displayName, taskOutputDir, classFile.entryName,
                     classFile.path.toAbsolutePath().normalize().toString(),
                     new DirectoryInputSource(classFile.path)));
@@ -186,8 +186,7 @@ final class SelectiveDecompilerTaskCollector {
                 if (name.startsWith(ArchiveNames.WEB_LIB) && name.toLowerCase().endsWith(".jar")) {
                     Path libJar = extractNested(zip, entry);
                     String libName = ArchiveNames.safeFileName(name.substring(ArchiveNames.WEB_LIB.length()));
-                    Path libOutput = outputDir.resolve("WEB-INF").resolve("lib")
-                            .resolve(ArchiveNames.stripExtension(libName));
+                    Path libOutput = outputDir.resolve("src").resolve("lib").resolve(ArchiveNames.stripExtension(libName));
                     processJar(libJar, libOutput, libName, sourceArchiveLabel + "!" + name, tasks);
                     continue;
                 }
@@ -210,7 +209,7 @@ final class SelectiveDecompilerTaskCollector {
                 }
 
                 tasks.add(new DecompileTask("WEB-INF/classes!" + mapped,
-                        outputDir.resolve("WEB-INF").resolve("classes"), mapped,
+                        outputDir.resolve("src"), mapped,
                         sourceArchiveLabel + "!" + DecompileUtils.toClassName(mapped),
                         new ZipInputSource(warFile, name)));
             }
@@ -229,5 +228,27 @@ final class SelectiveDecompilerTaskCollector {
 
     private boolean isUnderOutput(Path path) {
         return path.toAbsolutePath().normalize().startsWith(options.output);
+    }
+
+    /**
+     * Compute the output directory for a directory-mode class file.
+     * Replaces WEB-INF/classes and BOOT-INF/classes prefixes with "src"
+     * so the output structure uses a standard source layout.
+     */
+    private static Path outputDirForClassFile(Path baseDir, String rootName) {
+        if (rootName.isEmpty()) {
+            return baseDir;
+        }
+        String replaced = rootName;
+        if (replaced.equals("WEB-INF/classes") || replaced.equals("WEB-INF\\classes")) {
+            replaced = "src";
+        } else if (replaced.startsWith("WEB-INF/classes/") || replaced.startsWith("WEB-INF\\classes\\")) {
+            replaced = "src/" + replaced.substring("WEB-INF/classes/".length());
+        } else if (replaced.equals("BOOT-INF/classes") || replaced.equals("BOOT-INF\\classes")) {
+            replaced = "src";
+        } else if (replaced.startsWith("BOOT-INF/classes/") || replaced.startsWith("BOOT-INF\\classes\\")) {
+            replaced = "src/" + replaced.substring("BOOT-INF/classes/".length());
+        }
+        return baseDir.resolve(replaced);
     }
 }

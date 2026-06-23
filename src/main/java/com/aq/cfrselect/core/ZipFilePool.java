@@ -65,6 +65,7 @@ final class ZipFilePool implements Closeable {
         private final ZipFile zipFile;
         private final ConcurrentMap<Path, PooledZipFile> pool;
         private final AtomicInteger refCount = new AtomicInteger(1);
+        private volatile boolean closed = false;
 
         private PooledZipFile(Path archive, ZipFile zipFile,
                              ConcurrentMap<Path, PooledZipFile> pool) {
@@ -73,8 +74,14 @@ final class ZipFilePool implements Closeable {
             this.pool = pool;
         }
 
+        /**
+         * Try to increment the reference count.
+         * Synchronized to ensure atomicity with decAndCloseIfZero:
+         * if decAndCloseIfZero sees refCount=0 and is about to close,
+         * tryInc must not succeed after that decision.
+         */
         private synchronized boolean tryInc() {
-            if (zipFile == null) return false; // already closed
+            if (closed) return false;
             refCount.incrementAndGet();
             return true;
         }
@@ -96,21 +103,36 @@ final class ZipFilePool implements Closeable {
             decAndCloseIfZero();
         }
 
-        private void decAndCloseIfZero() {
-            if (refCount.decrementAndGet() == 0) {
-                forceClose();
-            }
-        }
-
-        private synchronized void forceClose() {
-            if (zipFile != null) {
+        /**
+         * Decrement ref count; close the ZipFile if it reaches zero.
+         * Synchronized to prevent race with tryInc: the decrement-and-check
+         * must be atomic with the close decision so that another thread
+         * cannot increment refCount between "refCount hit 0" and "close".
+         */
+        private synchronized void decAndCloseIfZero() {
+            if (refCount.decrementAndGet() == 0 && !closed) {
+                closed = true;
                 try {
-                    ((ZipFile) zipFile).close();
+                    zipFile.close();
                 } catch (IOException ignored) {
                     // best effort
                 }
                 pool.remove(archive, this);
             }
+        }
+
+        /**
+         * Force close regardless of ref-count (called during pool shutdown).
+         */
+        private synchronized void forceClose() {
+            if (closed) return;
+            closed = true;
+            try {
+                zipFile.close();
+            } catch (IOException ignored) {
+                // best effort
+            }
+            pool.remove(archive, this);
         }
     }
 }

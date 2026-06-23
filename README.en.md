@@ -8,11 +8,11 @@ A CFR-based batch decompiler for local Java auditing. It scans `.jar`, `.war`, c
 
 - Decompile a single `.jar`, `.war`, classes directory, or a directory tree containing archives and `.class` files.
 - Filter targets by one or more package prefixes, or omit filters to decompile every class.
-- Handle common archive layouts:
-  - `WEB-INF/classes`
-  - `WEB-INF/lib/*.jar`
-  - `BOOT-INF/classes`
-  - `BOOT-INF/lib/*.jar`
+- Handle common archive layouts with automatic output path normalization:
+  - `WEB-INF/classes` → `src/`
+  - `WEB-INF/lib/*.jar` → `src/lib/<jarName>/`
+  - `BOOT-INF/classes` → `src/`
+  - `BOOT-INF/lib/*.jar` → `src/lib/<jarName>/`
 - Recursively extract and process nested `.jar` and `.war` files.
 - Process classes in groups of `128` using a thread pool sized to the available CPU count.
 - Reuse existing non-empty `.java` outputs as cache hits.
@@ -23,7 +23,7 @@ A CFR-based batch decompiler for local Java auditing. It scans `.jar`, `.war`, c
 
 ### Performance (1.0.4+)
 
-- **ZipFile pool** - reuses open `ZipFile` handles across batch tasks via reference counting, eliminating repeated central directory reads.
+- **ZipFile pool** - reuses open `ZipFile` handles across batch tasks via reference counting, eliminating repeated central directory reads; concurrency safety ensured by `synchronized` + `volatile closed` flag.
 - **Entry name index** - pre-built `Map<String, ZipInputSource>` enables O(1) outer class lookup instead of scanning all archives.
 - **Single-pass directory walk** - merged two `Files.walk()` calls into one pass when scanning directories.
 - **32 KB IO buffers** - stream copy buffers increased from 8 KB to 32 KB.
@@ -57,6 +57,12 @@ Decompile a WAR and only keep classes under `com.example`:
 java -jar target/cfr-selective-dec.jar --input app.war --output out --packages com.example
 ```
 
+When `-o` is omitted, output defaults to `./src` in the current directory:
+
+```bash
+java -jar target/cfr-selective-dec.jar --input app.war --packages com.example
+```
+
 Decompile a directory tree and include every class:
 
 ```bash
@@ -88,7 +94,7 @@ java -jar cfr-selective-dec.jar <input.jar|input.war|input-dir> <output-dir> [pa
 | Option | Description |
 | --- | --- |
 | `-i, --input <path>` | Input `.jar`, `.war`, classes directory, or directory tree to scan. |
-| `-o, --output <dir>` | Directory for generated `.java` files, `summary.txt`, and `manifest.txt`. |
+| `-o, --output <dir>` | Directory for generated `.java` files, `summary.txt`, and `manifest.txt`. Default: `./src`. |
 | `-p, --packages <prefixes>` | Optional package prefixes. Use commas or semicolons to separate multiple prefixes. |
 | `--output-encoding <charset>` | Output encoding for `.java` files. Default: `UTF-8`. |
 | `--keep-temp` | Keep temporary extracted archives for troubleshooting. |
@@ -136,10 +142,33 @@ Use `--keep-temp` when you need to inspect extracted nested archives:
 java -jar target/cfr-selective-dec.jar --input app.war --output out --keep-temp
 ```
 
+### Output Directory Structure
+
+When decompiling a WAR file, output paths are automatically normalized:
+
+```text
+<output>/app-name/
+  src/
+    com/example/App.java                ← from WEB-INF/classes
+    com/example/Config.java             ← from WEB-INF/classes
+    lib/
+      spring-core/                      ← from WEB-INF/lib/spring-core.jar
+        org/springframework/Core.java
+      emm-dao/                          ← from WEB-INF/lib/emm-dao.jar
+        com/jianq/dao/Support.java
+```
+
+When decompiling a JAR file:
+
+```text
+<output>/mylib/
+  com/example/App.java                  ← from BOOT-INF/classes (prefix stripped)
+```
+
 ## How It Works
 
 1. Scan the input path for `.class`, `.jar`, and `.war` files.
-2. Normalize archive layouts such as `WEB-INF/classes` and `BOOT-INF/classes`.
+2. Normalize archive layouts: `WEB-INF/classes` / `BOOT-INF/classes` is replaced with `src/`, `WEB-INF/lib` / `BOOT-INF/lib` is replaced with `src/lib/`.
 3. Filter class entries by package prefix.
 4. Remove duplicate tasks that would produce the same final `.java` file.
 5. Decompile classes in groups of `128`.

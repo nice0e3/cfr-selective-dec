@@ -8,11 +8,11 @@
 
 - 支持反编译单个 `.jar`、`.war`、classes 目录，或包含归档与 `.class` 文件的目录树。
 - 支持按一个或多个包名前缀筛选；不指定包名前缀时默认反编译全部 class。
-- 支持常见归档布局：
-  - `WEB-INF/classes`
-  - `WEB-INF/lib/*.jar`
-  - `BOOT-INF/classes`
-  - `BOOT-INF/lib/*.jar`
+- 支持常见归档布局，输出路径自动规范化：
+  - `WEB-INF/classes` → `src/`
+  - `WEB-INF/lib/*.jar` → `src/lib/<jarName>/`
+  - `BOOT-INF/classes` → `src/`
+  - `BOOT-INF/lib/*.jar` → `src/lib/<jarName>/`
 - 支持递归提取并处理嵌套 `.jar` 和 `.war`。
 - 每组 `128` 个 class 批量提交给 CFR，线程池大小等于可用 CPU 数量。
 - 已存在且非空的 `.java` 文件会作为缓存命中跳过。
@@ -23,7 +23,7 @@
 
 ### 性能优化（1.0.4+）
 
-- **ZipFile 连接池** - 通过引用计数在批处理任务间复用 `ZipFile` 句柄，避免重复读取 ZIP 中央目录。
+- **ZipFile 连接池** - 通过引用计数在批处理任务间复用 `ZipFile` 句柄，避免重复读取 ZIP 中央目录；并发安全由 `synchronized` + `volatile closed` 标志保证。
 - **条目名索引** - 启动时预构建 `Map<String, ZipInputSource>` 索引，外部类查找从 O(N) 优化为 O(1)。
 - **单次目录遍历** - 将 `processDirectory()` 中的两次 `Files.walk()` 合并为单次遍历。
 - **32 KB IO 缓冲区** - 流拷贝缓冲区从 8 KB 提升至 32 KB。
@@ -57,6 +57,12 @@ target/cfr-selective-dec.jar
 java -jar target/cfr-selective-dec.jar --input app.war --output out --packages com.example
 ```
 
+不指定 `-o` 时默认输出到当前目录下的 `src`：
+
+```bash
+java -jar target/cfr-selective-dec.jar --input app.war --packages com.example
+```
+
 反编译目录树中的全部 class：
 
 ```bash
@@ -88,7 +94,7 @@ java -jar cfr-selective-dec.jar <input.jar|input.war|input-dir> <output-dir> [pa
 | 参数 | 说明 |
 | --- | --- |
 | `-i, --input <path>` | 输入 `.jar`、`.war`、classes 目录，或需要扫描的目录树。 |
-| `-o, --output <dir>` | 生成 `.java` 文件、`summary.txt` 和 `manifest.txt` 的输出目录。 |
+| `-o, --output <dir>` | 生成 `.java` 文件、`summary.txt` 和 `manifest.txt` 的输出目录。默认：`./src`。 |
 | `-p, --packages <prefixes>` | 可选包名前缀。多个前缀可用逗号或分号分隔。 |
 | `--output-encoding <charset>` | `.java` 文件输出编码。默认：`UTF-8`。 |
 | `--keep-temp` | 保留临时提取的嵌套归档，便于排查问题。 |
@@ -136,10 +142,33 @@ java -jar target/cfr-selective-dec.jar --input app.war --output out --debug
 java -jar target/cfr-selective-dec.jar --input app.war --output out --keep-temp
 ```
 
+### 输出目录结构
+
+反编译 WAR 文件时，输出路径会自动规范化：
+
+```text
+<output>/app-name/
+  src/
+    com/example/App.java                ← 来自 WEB-INF/classes
+    com/example/Config.java             ← 来自 WEB-INF/classes
+    lib/
+      spring-core/                      ← 来自 WEB-INF/lib/spring-core.jar
+        org/springframework/Core.java
+      emm-dao/                          ← 来自 WEB-INF/lib/emm-dao.jar
+        com/jianq/dao/Support.java
+```
+
+反编译 JAR 文件时：
+
+```text
+<output>/mylib/
+  com/example/App.java                  ← 来自 BOOT-INF/classes（前缀已去除）
+```
+
 ## 工作方式
 
 1. 扫描输入路径中的 `.class`、`.jar` 和 `.war` 文件。
-2. 规范化 `WEB-INF/classes`、`BOOT-INF/classes` 等归档布局。
+2. 规范化归档布局：`WEB-INF/classes` / `BOOT-INF/classes` 替换为 `src/`，`WEB-INF/lib` / `BOOT-INF/lib` 替换为 `src/lib/`。
 3. 按包名前缀筛选 class entry。
 4. 移除会生成同一个最终 `.java` 文件的重复任务。
 5. 按每组 `128` 个 class 批量反编译。

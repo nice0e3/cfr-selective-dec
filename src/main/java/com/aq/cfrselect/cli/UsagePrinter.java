@@ -14,7 +14,7 @@ public final class UsagePrinter {
         System.out.println("Options / 参数:");
         System.out.println("  -i, --input       Input .jar, .war, classes directory, or directory to scan");
         System.out.println("                    输入 .jar、.war、classes 目录，或需要递归扫描的目录");
-        System.out.println("  -o, --output      Output directory / 反编译输出目录");
+        System.out.println("  -o, --output      Output directory (default: ./src) / 反编译输出目录（默认：./src）");
         System.out.println("  -p, --packages    Optional package prefixes, comma or semicolon separated");
         System.out.println("                    Omit this option to decompile all classes");
         System.out.println("                    包名前缀，支持逗号或分号分隔");

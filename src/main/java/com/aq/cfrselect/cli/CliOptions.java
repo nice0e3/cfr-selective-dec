@@ -133,7 +133,8 @@ public final class CliOptions {
             throw new UsageException("Input must be .jar, .war, or a directory: " + options.input);
         }
         if (options.output == null) {
-            throw new UsageException("Missing output directory.");
+            options = new CliOptions(options.input, Paths.get("src").toAbsolutePath().normalize(),
+                    options.packages, options.outputEncoding, options.keepTemp, options.debug, options.help);
         }
         if (Files.isDirectory(options.input) && options.input.equals(options.output)) {
             throw new UsageException("Output directory must not be the same as the input directory.");
