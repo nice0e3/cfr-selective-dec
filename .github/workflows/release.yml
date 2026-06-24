@@ -25,7 +25,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -35,7 +35,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "8"
           cache: maven
 
       - name: Build
@@ -43,25 +43,27 @@ jobs:
 
       - name: Resolve release metadata
         id: release_meta
-        shell: pwsh
+        shell: bash
         run: |
-          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            $tag = "${{ inputs.tag }}"
-            $name = "${{ inputs.release_name }}"
-            $body = "${{ inputs.body }}"
-          } else {
-            $tag = "${{ github.ref_name }}"
-            $name = "${{ github.ref_name }}"
-            $body = "添加workflow自动编译"
-          }
-          if ([string]::IsNullOrWhiteSpace($name)) {
-            $name = $tag
-          }
-          "tag=$tag" >> $env:GITHUB_OUTPUT
-          "name=$name" >> $env:GITHUB_OUTPUT
-          "body<<EOF" >> $env:GITHUB_OUTPUT
-          $body >> $env:GITHUB_OUTPUT
-          "EOF" >> $env:GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+            name="${{ inputs.release_name }}"
+            body="${{ inputs.body }}"
+          else
+            tag="${{ github.ref_name }}"
+            name="${{ github.ref_name }}"
+            body="添加workflow自动编译"
+          fi
+          if [ -z "$name" ]; then
+            name="$tag"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          {
+            echo "body<<EOF"
+            echo "$body"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
