@@ -180,7 +180,7 @@ final class SelectiveDecompilerTaskCollector {
             }
         }
         if (options.addLib && tasks.size() == tasksBefore) {
-            unmatchedLibJars.add(new UnmatchedLibJar(jarFile, displayName));
+            unmatchedLibJars.add(new UnmatchedLibJar(jarFile, displayName, outputDir.getParent()));
         }
     }
 
@@ -268,20 +268,20 @@ final class SelectiveDecompilerTaskCollector {
         if (unmatchedLibJars.isEmpty()) {
             return;
         }
-        Path libDir = outputDir.resolve("src").resolve("srclib").resolve("lib");
-        Files.createDirectories(libDir);
         for (UnmatchedLibJar lib : unmatchedLibJars) {
-            Path target = libDir.resolve(lib.fileName);
+            Files.createDirectories(lib.libDir);
+            Path target = lib.libDir.resolve(lib.fileName);
             Files.copy(lib.path, target, StandardCopyOption.REPLACE_EXISTING);
         }
-        System.out.println("Copied " + unmatchedLibJars.size() + " unmatched lib JARs to " + libDir);
+        System.out.println("Copied " + unmatchedLibJars.size() + " unmatched lib JARs");
     }
 
     private static final class UnmatchedLibJar {
         final Path path;
         final String fileName;
+        final Path libDir;
 
-        UnmatchedLibJar(Path path, String displayName) {
+        UnmatchedLibJar(Path path, String displayName, Path srclibDir) {
             this.path = path;
             // Use displayName as the base — it preserves the original name from the archive
             // (path.getFileName() may be a temp file like "1-WEB-INF_lib_xxx.jar")
@@ -290,6 +290,7 @@ final class SelectiveDecompilerTaskCollector {
                 name = name + ".jar";
             }
             this.fileName = ArchiveNames.safeFileName(name);
+            this.libDir = srclibDir.resolve("lib");
         }
     }
 }
