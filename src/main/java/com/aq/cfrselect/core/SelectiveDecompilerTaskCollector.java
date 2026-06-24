@@ -198,7 +198,7 @@ final class SelectiveDecompilerTaskCollector {
                 if (name.startsWith(ArchiveNames.WEB_LIB) && name.toLowerCase().endsWith(".jar")) {
                     Path libJar = extractNested(zip, entry);
                     String libName = ArchiveNames.safeFileName(name.substring(ArchiveNames.WEB_LIB.length()));
-                    Path libOutput = outputDir.resolve("src").resolve("lib").resolve(ArchiveNames.stripExtension(libName));
+                    Path libOutput = outputDir.resolve("src").resolve("srclib").resolve(ArchiveNames.stripExtension(libName));
                     processJar(libJar, libOutput, libName, sourceArchiveLabel + "!" + name, tasks);
                     continue;
                 }
@@ -268,7 +268,7 @@ final class SelectiveDecompilerTaskCollector {
         if (unmatchedLibJars.isEmpty()) {
             return;
         }
-        Path libDir = outputDir.resolve("lib").resolve("lib");
+        Path libDir = outputDir.resolve("src").resolve("srclib").resolve("lib");
         Files.createDirectories(libDir);
         for (UnmatchedLibJar lib : unmatchedLibJars) {
             Path target = libDir.resolve(lib.fileName);
