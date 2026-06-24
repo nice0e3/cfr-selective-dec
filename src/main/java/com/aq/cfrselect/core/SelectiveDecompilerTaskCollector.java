@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -30,6 +31,7 @@ final class SelectiveDecompilerTaskCollector {
     private final PackageMatcher matcher;
     private final Path tempRoot;
     private final SelectiveDecompilerSummary summary;
+    private final List<UnmatchedLibJar> unmatchedLibJars;
 
     SelectiveDecompilerTaskCollector(CliOptions options, PackageMatcher matcher,
                                      Path tempRoot, SelectiveDecompilerSummary summary) {
@@ -37,6 +39,7 @@ final class SelectiveDecompilerTaskCollector {
         this.matcher = matcher;
         this.tempRoot = tempRoot;
         this.summary = summary;
+        this.unmatchedLibJars = new ArrayList<UnmatchedLibJar>();
     }
 
     List<DecompileTask> collect() throws IOException, InterruptedException {
@@ -55,6 +58,11 @@ final class SelectiveDecompilerTaskCollector {
             }
         });
         summary.matchedClasses.set(uniqueTasks.size());
+
+        if (options.addLib) {
+            copyUnmatchedLibs(options.output);
+        }
+
         return uniqueTasks;
     }
 
@@ -146,6 +154,7 @@ final class SelectiveDecompilerTaskCollector {
     private void processJar(Path jarFile, Path outputDir, String displayName,
                             String sourceArchiveLabel, List<DecompileTask> tasks)
             throws IOException, InterruptedException {
+        int tasksBefore = tasks.size();
         try (ZipFile zip = new ZipFile(jarFile.toFile())) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
             while (entries.hasMoreElements()) {
@@ -169,6 +178,9 @@ final class SelectiveDecompilerTaskCollector {
                         sourceArchiveLabel + "!" + DecompileUtils.toClassName(mapped),
                         new ZipInputSource(jarFile, entryName)));
             }
+        }
+        if (options.addLib && tasks.size() == tasksBefore) {
+            unmatchedLibJars.add(new UnmatchedLibJar(jarFile, displayName));
         }
     }
 
@@ -250,5 +262,33 @@ final class SelectiveDecompilerTaskCollector {
             replaced = "src/" + replaced.substring("BOOT-INF/classes/".length());
         }
         return baseDir.resolve(replaced);
+    }
+
+    private void copyUnmatchedLibs(Path outputDir) throws IOException {
+        if (unmatchedLibJars.isEmpty()) {
+            return;
+        }
+        Path libDir = outputDir.resolve("lib").resolve("lib");
+        Files.createDirectories(libDir);
+        for (UnmatchedLibJar lib : unmatchedLibJars) {
+            Path target = libDir.resolve(lib.fileName);
+            Files.copy(lib.path, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+        System.out.println("Copied " + unmatchedLibJars.size() + " unmatched lib JARs to " + libDir);
+    }
+
+    private static final class UnmatchedLibJar {
+        final Path path;
+        final String fileName;
+
+        UnmatchedLibJar(Path path, String displayName) {
+            this.path = path;
+            // Prefer the actual file name from the path; fall back to safe display name
+            String name = path.getFileName() != null ? path.getFileName().toString() : displayName;
+            if (!name.toLowerCase(Locale.ROOT).endsWith(".jar")) {
+                name = name + ".jar";
+            }
+            this.fileName = ArchiveNames.safeFileName(name);
+        }
     }
 }

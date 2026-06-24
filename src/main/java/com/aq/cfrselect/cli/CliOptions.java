@@ -18,16 +18,18 @@ public final class CliOptions {
     public final List<String> packages;
     public final String outputEncoding;
     public final boolean keepTemp;
+    public final boolean addLib;
     public final boolean debug;
     public final boolean help;
 
     private CliOptions(Path input, Path output, List<String> packages, String outputEncoding,
-                       boolean keepTemp, boolean debug, boolean help) {
+                       boolean keepTemp, boolean addLib, boolean debug, boolean help) {
         this.input = input;
         this.output = output;
         this.packages = packages;
         this.outputEncoding = outputEncoding;
         this.keepTemp = keepTemp;
+        this.addLib = addLib;
         this.debug = debug;
         this.help = help;
     }
@@ -35,7 +37,7 @@ public final class CliOptions {
     public static CliOptions parse(String[] args) {
         if (args.length == 0 || has(args, "-h") || has(args, "--help")) {
             return new CliOptions(null, null, Collections.<String>emptyList(),
-                    ArchiveNames.DEFAULT_OUTPUT_ENCODING, false, has(args, "--debug"), true);
+                    ArchiveNames.DEFAULT_OUTPUT_ENCODING, false, false, has(args, "--debug"), true);
         }
 
         if (args[0].startsWith("-")) {
@@ -61,6 +63,7 @@ public final class CliOptions {
         Path input = Paths.get(args[0]).toAbsolutePath().normalize();
         Path output = Paths.get(args[1]).toAbsolutePath().normalize();
         boolean keepTemp = false;
+        boolean addLib = false;
         boolean debug = false;
         String outputEncoding = ArchiveNames.DEFAULT_OUTPUT_ENCODING;
         List<String> packages = new ArrayList<>();
@@ -68,6 +71,8 @@ public final class CliOptions {
             String arg = args[i];
             if ("--keep-temp".equals(arg)) {
                 keepTemp = true;
+            } else if ("--add-lib".equals(arg)) {
+                addLib = true;
             } else if ("--debug".equals(arg)) {
                 debug = true;
             } else if ("--output-encoding".equals(arg) || "--outputencoding".equals(arg)) {
@@ -78,13 +83,14 @@ public final class CliOptions {
                 packages.addAll(parsePackages(new String[] { arg }));
             }
         }
-        return validate(new CliOptions(input, output, packages, outputEncoding, keepTemp, debug, false));
+        return validate(new CliOptions(input, output, packages, outputEncoding, keepTemp, addLib, debug, false));
     }
 
     private static CliOptions parseNamed(String[] args) {
         Path input = null;
         Path output = null;
         boolean keepTemp = false;
+        boolean addLib = false;
         boolean debug = false;
         String outputEncoding = ArchiveNames.DEFAULT_OUTPUT_ENCODING;
         List<String> packages = new ArrayList<>();
@@ -111,6 +117,9 @@ public final class CliOptions {
                 case "--keep-temp":
                     keepTemp = true;
                     break;
+                case "--add-lib":
+                    addLib = true;
+                    break;
                 case "--debug":
                     debug = true;
                     break;
@@ -119,7 +128,7 @@ public final class CliOptions {
             }
         }
 
-        return validate(new CliOptions(input, output, packages, outputEncoding, keepTemp, debug, false));
+        return validate(new CliOptions(input, output, packages, outputEncoding, keepTemp, addLib, debug, false));
     }
 
     private static CliOptions validate(CliOptions options) {
@@ -134,7 +143,7 @@ public final class CliOptions {
         }
         if (options.output == null) {
             options = new CliOptions(options.input, Paths.get("src").toAbsolutePath().normalize(),
-                    options.packages, options.outputEncoding, options.keepTemp, options.debug, options.help);
+                    options.packages, options.outputEncoding, options.keepTemp, options.addLib, options.debug, options.help);
         }
         if (Files.isDirectory(options.input) && options.input.equals(options.output)) {
             throw new UsageException("Output directory must not be the same as the input directory.");
