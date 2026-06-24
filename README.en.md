@@ -10,9 +10,10 @@ A CFR-based batch decompiler for local Java auditing. It scans `.jar`, `.war`, c
 - Filter targets by one or more package prefixes, or omit filters to decompile every class.
 - Handle common archive layouts with automatic output path normalization:
   - `WEB-INF/classes` → `src/`
-  - `WEB-INF/lib/*.jar` → `src/lib/<jarName>/`
+  - `WEB-INF/lib/*.jar` → `src/srclib/<jarName>/`
   - `BOOT-INF/classes` → `src/`
-  - `BOOT-INF/lib/*.jar` → `src/lib/<jarName>/`
+  - `BOOT-INF/lib/*.jar` → `src/srclib/<jarName>/`
+- Support `--add-lib` to copy lib JARs not matching `-p` package prefixes into `src/srclib/lib/`.
 - Recursively extract and process nested `.jar` and `.war` files.
 - Process classes in groups of `128` using a thread pool sized to the available CPU count.
 - Reuse existing non-empty `.java` outputs as cache hits.
@@ -98,6 +99,7 @@ java -jar cfr-selective-dec.jar <input.jar|input.war|input-dir> <output-dir> [pa
 | `-p, --packages <prefixes>` | Optional package prefixes. Use commas or semicolons to separate multiple prefixes. |
 | `--output-encoding <charset>` | Output encoding for `.java` files. Default: `UTF-8`. |
 | `--keep-temp` | Keep temporary extracted archives for troubleshooting. |
+| `--add-lib` | Copy lib JARs not matching `-p` package prefixes into `src/srclib/lib/` in the output directory. |
 | `--debug` | Print full exception stack traces and debug logs. |
 | `-h, --help` | Show command help. |
 
@@ -151,11 +153,14 @@ When decompiling a WAR file, output paths are automatically normalized:
   src/
     com/example/App.java                ← from WEB-INF/classes
     com/example/Config.java             ← from WEB-INF/classes
-    lib/
+    srclib/
       spring-core/                      ← from WEB-INF/lib/spring-core.jar
         org/springframework/Core.java
       emm-dao/                          ← from WEB-INF/lib/emm-dao.jar
         com/jianq/dao/Support.java
+      lib/                              ← --add-lib unmatched lib JARs
+        xxx.jar
+        yyy.jar
 ```
 
 When decompiling a JAR file:
@@ -168,7 +173,7 @@ When decompiling a JAR file:
 ## How It Works
 
 1. Scan the input path for `.class`, `.jar`, and `.war` files.
-2. Normalize archive layouts: `WEB-INF/classes` / `BOOT-INF/classes` is replaced with `src/`, `WEB-INF/lib` / `BOOT-INF/lib` is replaced with `src/lib/`.
+2. Normalize archive layouts: `WEB-INF/classes` / `BOOT-INF/classes` is replaced with `src/`, `WEB-INF/lib` / `BOOT-INF/lib` is replaced with `src/srclib/`.
 3. Filter class entries by package prefix.
 4. Remove duplicate tasks that would produce the same final `.java` file.
 5. Decompile classes in groups of `128`.

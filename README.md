@@ -10,9 +10,10 @@
 - 支持按一个或多个包名前缀筛选；不指定包名前缀时默认反编译全部 class。
 - 支持常见归档布局，输出路径自动规范化：
   - `WEB-INF/classes` → `src/`
-  - `WEB-INF/lib/*.jar` → `src/lib/<jarName>/`
+  - `WEB-INF/lib/*.jar` → `src/srclib/<jarName>/`
   - `BOOT-INF/classes` → `src/`
-  - `BOOT-INF/lib/*.jar` → `src/lib/<jarName>/`
+  - `BOOT-INF/lib/*.jar` → `src/srclib/<jarName>/`
+- 支持 `--add-lib` 将未匹配包名前缀的 lib JAR 复制到 `src/srclib/lib/` 下。
 - 支持递归提取并处理嵌套 `.jar` 和 `.war`。
 - 每组 `128` 个 class 批量提交给 CFR，线程池大小等于可用 CPU 数量。
 - 已存在且非空的 `.java` 文件会作为缓存命中跳过。
@@ -98,6 +99,7 @@ java -jar cfr-selective-dec.jar <input.jar|input.war|input-dir> <output-dir> [pa
 | `-p, --packages <prefixes>` | 可选包名前缀。多个前缀可用逗号或分号分隔。 |
 | `--output-encoding <charset>` | `.java` 文件输出编码。默认：`UTF-8`。 |
 | `--keep-temp` | 保留临时提取的嵌套归档，便于排查问题。 |
+| `--add-lib` | 将未匹配 `-p` 包名前缀的 lib JAR 复制到输出目录的 `src/srclib/lib/` 下。 |
 | `--debug` | 输出完整异常堆栈和调试日志。 |
 | `-h, --help` | 显示命令帮助。 |
 
@@ -151,11 +153,14 @@ java -jar target/cfr-selective-dec.jar --input app.war --output out --keep-temp
   src/
     com/example/App.java                ← 来自 WEB-INF/classes
     com/example/Config.java             ← 来自 WEB-INF/classes
-    lib/
+    srclib/
       spring-core/                      ← 来自 WEB-INF/lib/spring-core.jar
         org/springframework/Core.java
       emm-dao/                          ← 来自 WEB-INF/lib/emm-dao.jar
         com/jianq/dao/Support.java
+      lib/                              ← --add-lib 未匹配的 lib JAR
+        xxx.jar
+        yyy.jar
 ```
 
 反编译 JAR 文件时：
@@ -168,7 +173,7 @@ java -jar target/cfr-selective-dec.jar --input app.war --output out --keep-temp
 ## 工作方式
 
 1. 扫描输入路径中的 `.class`、`.jar` 和 `.war` 文件。
-2. 规范化归档布局：`WEB-INF/classes` / `BOOT-INF/classes` 替换为 `src/`，`WEB-INF/lib` / `BOOT-INF/lib` 替换为 `src/lib/`。
+2. 规范化归档布局：`WEB-INF/classes` / `BOOT-INF/classes` 替换为 `src/`，`WEB-INF/lib` / `BOOT-INF/lib` 替换为 `src/srclib/`。
 3. 按包名前缀筛选 class entry。
 4. 移除会生成同一个最终 `.java` 文件的重复任务。
 5. 按每组 `128` 个 class 批量反编译。
