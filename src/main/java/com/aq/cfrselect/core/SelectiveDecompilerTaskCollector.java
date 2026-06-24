@@ -283,8 +283,9 @@ final class SelectiveDecompilerTaskCollector {
 
         UnmatchedLibJar(Path path, String displayName) {
             this.path = path;
-            // Prefer the actual file name from the path; fall back to safe display name
-            String name = path.getFileName() != null ? path.getFileName().toString() : displayName;
+            // Use displayName as the base — it preserves the original name from the archive
+            // (path.getFileName() may be a temp file like "1-WEB-INF_lib_xxx.jar")
+            String name = displayName;
             if (!name.toLowerCase(Locale.ROOT).endsWith(".jar")) {
                 name = name + ".jar";
             }
